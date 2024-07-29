@@ -62,7 +62,7 @@ class Redflags(db.Model, SerializerMixin):
     status = db.Column(db.String, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
-    serialize_rules = ('-user.redflags',)
+    serialize_rules = ('-user',)
 
     def __repr__(self):
         return f"<Redflags {self.id}>"
@@ -80,7 +80,7 @@ class Intervention(db.Model, SerializerMixin):
     status = db.Column(db.String, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
-    serialize_rules = ('-user.interventions',)
+    serialize_rules = ('-user',)
 
     def __repr__(self):
         return f"<Intervention {self.id}>"

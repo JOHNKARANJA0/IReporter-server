@@ -12,7 +12,7 @@ from models import db, Redflags, Intervention, User, bcrypt
 app = Flask(__name__)
 CORS(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db' #os.environ.get('DATABASE_URI')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI') #'sqlite:///app.db' 
 app.config["JWT_SECRET_KEY"] = "your_jwt_secret_key"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 app.config["SECRET_KEY"] = "your_secret_key"
@@ -49,8 +49,8 @@ class CheckSession(Resource):
         current_user_id = get_jwt_identity()
         current_user = User.query.get(current_user_id)
         if current_user:
-            intervention = [interv.to_dict() for interv in current_user.interventions]
-            redflags = [redflgs.to_dict() for redflgs in current_user.redflags]
+            intervention = [interv.to_dict(only=('id', 'intervention', 'description', 'geolocation', 'image', 'video', 'date_added', 'status')) for interv in current_user.interventions]
+            redflags = [redflgs.to_dict(only=('id', 'redflag', 'description', 'geolocation', 'image', 'video', 'date_added', 'status')) for redflgs in current_user.redflags]
             return {
                 "id": current_user.id,
                 "name": current_user.name,
