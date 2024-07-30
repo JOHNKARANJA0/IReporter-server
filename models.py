@@ -59,7 +59,7 @@ class Redflags(db.Model, SerializerMixin):
     image = db.Column(db.String, nullable=True)
     video = db.Column(db.String, nullable=True)
     date_added = db.Column(db.DateTime, default=lambda: datetime.now(tz=timezone.utc))
-    status = db.Column(db.String, nullable=True)
+    status = db.Column(db.String, default='draft')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
     serialize_rules = ('-user',)
@@ -77,7 +77,7 @@ class Intervention(db.Model, SerializerMixin):
     image = db.Column(db.String, nullable=True)
     video = db.Column(db.String, nullable=True)
     date_added = db.Column(db.DateTime, default=lambda: datetime.now(tz=timezone.utc))
-    status = db.Column(db.String, nullable=True)
+    status = db.Column(db.String, default='draft')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
     serialize_rules = ('-user',)
