@@ -11,7 +11,7 @@ from models import db, Redflags, Intervention, User, bcrypt
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]}})
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI') #'sqlite:///app.db' 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db' #os.environ.get('DATABASE_URI') 
 app.config["JWT_SECRET_KEY"] = "your_jwt_secret_key"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 app.config["SECRET_KEY"] = "your_secret_key"
@@ -76,7 +76,7 @@ class Logout(Resource):
 class Users(Resource):
     def get(self):
         users = User.query.all()
-        return [user.to_dict() for user in users], 200
+        return [user.to_dict(only=('id', 'name', 'email', 'role', 'interventions','redflags')) for user in users], 200
 
     def post(self):
         data = request.get_json()
