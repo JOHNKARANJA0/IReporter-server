@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 import os
 from datetime import timedelta
+import pyotp
 from flask import Flask, request, jsonify
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required, get_jwt
 from flask_restful import Api, Resource
 from flask_cors import CORS
 from models import db, Redflags, Intervention, User, bcrypt
+from utils import generate_totp_secret, generate_totp_token, send_email
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]}})
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI') #'sqlite:///app.db'
+app.config['SQLALCHEMY_DATABASE_URI'] =os.environ.get('DATABASE_URI') #'sqlite:///app.db' 
 app.config["JWT_SECRET_KEY"] = "your_jwt_secret_key"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 app.config["SECRET_KEY"] = "your_secret_key"
@@ -56,7 +58,8 @@ class CheckSession(Resource):
                 "email": user.email,
                 "role": user.role,
                 "intervention": intervention,
-                "redflags": redflags
+                "redflags": redflags,
+                "token_verified": user.token_verified
             }, 200
         else:
             return {"error": "User not found"}, 404
@@ -76,7 +79,7 @@ class Logout(Resource):
 class Users(Resource):
     def get(self):
         users = User.query.all()
-        return [user.to_dict(only=('id', 'name', 'email', 'role', 'interventions','redflags')) for user in users], 200
+        return [user.to_dict(only=('id', 'name', 'email', 'role', 'interventions','redflags', 'token_verified')) for user in users], 200
 
     def post(self):
         data = request.get_json()
@@ -84,19 +87,59 @@ class Users(Resource):
         user_role = 'user'
         try:
             password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+            totp_secret = generate_totp_secret()
+            totp_token = generate_totp_token(totp_secret)
             new_user = User(
                 name=data['name'],
                 email=data['email'],
-                role=user_role
+                role=user_role,
+                _password_hash=password_hash,
+                token=totp_secret
             )
-            new_user._password_hash = password_hash
             db.session.add(new_user)
             db.session.commit()
-            return {"success": "User created successfully!"}, 201
+            # Send the token to user's email
+            email_sent = send_email(
+                to_email=data['email'],
+                subject="Your Verification Token",
+                body=f"""Hello, {data['name']}. Welcome to the Ireporter app. 
+                         Your verification token is: {totp_token}"""
+            )
+            if email_sent:
+                return {"success": "User created successfully! Verification token sent to email.", "user": new_user.to_dict()}, 201
+            else:
+                return {"success": "User created successfully! Failed to send verification token.", "user": new_user.to_dict()}, 201
         except Exception as e:
             db.session.rollback()
             return {"errors": [str(e)]}, 400
+class VerifyToken(Resource):
+    def post(self):
+        data = request.get_json()
+        email = data['email']
+        token_from_request = data['token']
 
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            totp = pyotp.TOTP(user.token, interval=200) 
+
+            # Print for debugging
+            print(f"Token from request: {token_from_request}")
+            print(f"User token secret: {user.token}")
+            print(f"Current time: {totp.now()}")
+
+            # Verify the token
+            is_valid = totp.verify(token_from_request, valid_window=1)
+            print(f"Token Verification Result: {is_valid}")
+
+            if is_valid:
+                user.token_verified = True
+                db.session.commit()
+                return {"message": "Token verified successfully."}, 200
+            else:
+                return {"message": "Invalid token or email."}, 400
+        else:
+            return {"message": "User not found."}, 404
 class RedflagResource(Resource):
     def get(self):
         redflag = Redflags.query.all()
@@ -233,6 +276,7 @@ api.add_resource(Login, '/login')
 api.add_resource(CheckSession, '/check_session')
 api.add_resource(Logout, '/logout')
 api.add_resource(Users, '/users')
+api.add_resource(VerifyToken, '/verify_token')
 api.add_resource(RedflagResource, '/redflags', '/redflags/<int:redflag_id>')
 api.add_resource(InterventionResource, '/interventions', '/interventions/<int:intervention_id>')
 api.add_resource(AdminStatusUpdateResource, '/admin/<string:entity_type>/<int:entity_id>/status')

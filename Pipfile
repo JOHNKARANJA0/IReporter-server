@@ -24,6 +24,7 @@ bcrypt = "*"
 flask-session = "*"
 redis = "*"
 flask-jwt-extended = "*"
+pyotp = "*"
 
 [requires]
 python_full_version = "3.8.13"

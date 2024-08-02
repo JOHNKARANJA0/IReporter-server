@@ -27,6 +27,10 @@ class User(db.Model, SerializerMixin):
     email = db.Column(db.String(100), unique=True, nullable=False)
     role = db.Column(db.String, nullable=False)
     _password_hash = db.Column('password_hash', db.String(128), nullable=False)
+    token = db.Column(db.String(32), nullable=True)
+    token_verified = db.Column(db.Boolean, default=False)
+    
+    
     redflags = db.relationship('Redflags', backref='user', lazy=True, cascade='all, delete-orphan')
     interventions = db.relationship('Intervention', backref='user', lazy=True, cascade='all, delete-orphan')
     

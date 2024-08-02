@@ -10,27 +10,31 @@ def seed_data():
     user1 = User(
         name="John Doe",
         email="john@example.com",
-        role="user"
+        role="user",
+        token_verified= True
     )
     user1.password_hash = "password123"  # This will automatically hash the password
 
     user2 = User(
         name="Jane Smith",
         email="jane@example.com",
-        role="admin"
+        role="admin",
+        token_verified= True
     )
     user2.password_hash = "password123"  # This will automatically hash the password
     
     user3 = User(
-        name="Jonnie sins",
-        email="jonnie@example.com",
-        role="admin"
+        name="Perry Jackson",
+        email="perry@example.com",
+        role="admin",
+        token_verified= True
     )
     user3.password_hash = "password123"
     user4 = User(
-        name="Peter",
-        email="peter@example.com",
-        role="user"
+        name="Victor Adams",
+        email="victor@example.com",
+        role="user",
+        token_verified= True
     )
     user4.password_hash = "password123" 
 
