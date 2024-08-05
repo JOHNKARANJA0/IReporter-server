@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 from datetime import timedelta
+import cloudinary
+from cloudinary.uploader import upload as cloudinary_upload
 import pyotp
 from flask import Flask, request, jsonify
 from flask_migrate import Migrate
@@ -13,18 +15,24 @@ from utils import generate_totp_secret, generate_totp_token, send_email
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]}})
 
-app.config['SQLALCHEMY_DATABASE_URI'] =os.environ.get('DATABASE_URI') #'sqlite:///app.db' 
+app.config['SQLALCHEMY_DATABASE_URI'] =os.environ.get('DATABASE_URI') #'sqlite:///app.db'   
 app.config["JWT_SECRET_KEY"] = "your_jwt_secret_key"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 app.config["SECRET_KEY"] = "your_secret_key"
 
 app.json.compact = False
-jwt = JWTManager(app)
+jwt = JWTManager(app)       
 
 migrate = Migrate(app, db)
 db.init_app(app)
 bcrypt.init_app(app)
 api = Api(app)
+
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUD_NAME'),
+    api_key=os.environ.get('API_KEY'),
+    api_secret=os.environ.get('API_SECRET')
+)
 
 @app.route("/")
 def index():
@@ -102,8 +110,7 @@ class Users(Resource):
             email_sent = send_email(
                 to_email=data['email'],
                 subject="Your Verification Token",
-                body=f"""Hello, {data['name']}. Welcome to the Ireporter app. 
-                         Your verification token is: {totp_token}"""
+                body=f"""Hello, {data['name']}. Welcome to the Ireporter app.Your verification token is: {totp_token}"""
             )
             if email_sent:
                 return {"success": "User created successfully! Verification token sent to email.", "user": new_user.to_dict()}, 201
@@ -147,15 +154,36 @@ class RedflagResource(Resource):
     @jwt_required()
     def post(self):
         current_user = get_jwt_identity()
-        data = request.get_json()
+        data = request.form
+        image = request.files.get('image')
+        video = data.get('video')
+
         try:
+            if image:
+                upload_result = cloudinary_upload(image, resource_type="image", transformation=[
+                    {"width": 200, "height": 200, "crop": "fill", "gravity": "auto"},
+                    {"fetch_format": "auto", "quality": "auto"}
+                ])
+                image_url = upload_result['secure_url']
+            else:
+                image_url = None
+
+            if video:
+                upload_result = cloudinary_upload(video, resource_type="video", transformation=[
+                    {"width": 640, "height": 360, "crop": "limit", "gravity": "auto"},
+                    {"fetch_format": "auto", "quality": "auto"}
+                ])
+                video_url = upload_result['secure_url']
+            else:
+                video_url = None
+
             new_redflag = Redflags(
-                redflag=data['redflag'],
-                description=data['description'],
+                redflag=data.get('redflag'),
+                description=data.get('description'),
                 geolocation=data.get('geolocation'),
-                image=data.get('image'),
-                video=data.get('video'),
-                user_id=current_user['id']
+                image=image_url,
+                video=video_url,
+                user_id=current_user
             )
             db.session.add(new_redflag)
             db.session.commit()
@@ -168,18 +196,34 @@ class RedflagResource(Resource):
     def patch(self, redflag_id):
         current_user = get_jwt_identity()
         redflag = Redflags.query.get(redflag_id)
-        if redflag and redflag.user_id == current_user['id'] and redflag.status == 'draft':
-            data = request.get_json()
-            redflag.redflag = data.get('redflag', redflag.redflag)
-            redflag.description = data.get('description', redflag.description)
-            redflag.geolocation = data.get('geolocation', redflag.geolocation)
-            redflag.image = data.get('image', redflag.image)
-            redflag.video = data.get('video', redflag.video)
-            db.session.commit()
-            return redflag.to_dict(), 200
+        if redflag and redflag.user_id == current_user and redflag.status == 'draft':
+            data = request.form
+            image = request.files.get('image')
+            video = data.get('video')
+
+            try:
+                if image:
+                    upload_result = cloudinary_upload(image, resource_type="image", transformation=[
+                    {"width": 500, "height": 500, "crop": "fill", "gravity": "auto"},
+                    {"fetch_format": "auto", "quality": "auto"}
+                ])
+                    redflag.image = upload_result['secure_url']
+                if video:
+                    upload_result = cloudinary_upload(video, resource_type="video", transformation=[
+                        {"width": 640, "height": 360, "crop": "limit", "gravity": "auto"},
+                        {"fetch_format": "auto", "quality": "auto"}
+                    ])
+                    redflag.video = upload_result['secure_url']
+                redflag.redflag = data.get('redflag', redflag.redflag)
+                redflag.description = data.get('description', redflag.description)
+                redflag.geolocation = data.get('geolocation', redflag.geolocation)
+                db.session.commit()
+                return redflag.to_dict(), 200
+            except Exception as e:
+                db.session.rollback()
+                return {"errors": [str(e)]}, 400
         else:
             return {"error": "Not allowed to update"}, 403
-
     @jwt_required()
     def delete(self, redflag_id):
         current_user = get_jwt_identity()
@@ -198,15 +242,36 @@ class InterventionResource(Resource):
     @jwt_required()
     def post(self):
         current_user = get_jwt_identity()
-        data = request.get_json()
+        data = request.form
+        image = request.files.get('image')
+        video = data.get('video')
+
         try:
+            if image:
+                upload_result = cloudinary_upload(image, resource_type="image", transformation=[
+                    {"width": 200, "height": 200, "crop": "fill", "gravity": "auto"},
+                    {"fetch_format": "auto", "quality": "auto"}
+                ])
+                image_url = upload_result['secure_url']
+            else:
+                image_url = None
+
+            if video:
+                upload_result = cloudinary_upload(video, resource_type="video", transformation=[
+                    {"width": 640, "height": 360, "crop": "limit", "gravity": "auto"},
+                    {"fetch_format": "auto", "quality": "auto"}
+                ])
+                video_url = upload_result['secure_url']
+            else:
+                video_url = None
+
             new_intervention = Intervention(
-                intervention=data['intervention'],
-                description=data['description'],
+                intervention=data.get('intervention'),
+                description=data.get('description'),
                 geolocation=data.get('geolocation'),
-                image=data.get('image'),
-                video=data.get('video'),
-                user_id=current_user['id']
+                image=image_url,
+                video=video_url,
+                user_id=current_user
             )
             db.session.add(new_intervention)
             db.session.commit()
@@ -219,15 +284,28 @@ class InterventionResource(Resource):
     def patch(self, intervention_id):
         current_user = get_jwt_identity()
         intervention = Intervention.query.get(intervention_id)
-        if intervention and intervention.user_id == current_user['id'] and intervention.status == 'draft':
-            data = request.get_json()
-            intervention.intervention = data.get('intervention', intervention.intervention)
-            intervention.description = data.get('description', intervention.description)
-            intervention.geolocation = data.get('geolocation', intervention.geolocation)
-            intervention.image = data.get('image', intervention.image)
-            intervention.video = data.get('video', intervention.video)
-            db.session.commit()
-            return intervention.to_dict(), 200
+        if intervention and intervention.user_id == current_user and intervention.status == 'draft':
+            data = request.form
+            image = request.files.get('image')
+            video = data.get('video')
+
+            try:
+                if image:
+                    upload_result = cloudinary_upload(image, resource_type="image", transformation=[
+                    {"width": 500, "height": 500, "crop": "fill", "gravity": "auto"},
+                    {"fetch_format": "auto", "quality": "auto"}
+                ])
+                    intervention.image = upload_result['secure_url']
+                if video:
+                    intervention.video = video
+                intervention.intervention = data.get('intervention', intervention.intervention)
+                intervention.description = data.get('description', intervention.description)
+                intervention.geolocation = data.get('geolocation', intervention.geolocation)
+                db.session.commit()
+                return intervention.to_dict(), 200
+            except Exception as e:
+                db.session.rollback()
+                return {"errors": [str(e)]}, 400
         else:
             return {"error": "Not allowed to update"}, 403
 
