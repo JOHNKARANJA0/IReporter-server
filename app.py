@@ -324,11 +324,7 @@ class AdminStatusUpdateResource(Resource):
     @jwt_required()
     def patch(self, entity_type, entity_id):
         current_user_id = get_jwt_identity()
-
-        # Query the user object using the ID
         user = User.query.get(current_user_id)
-        
-        # Ensure the user is an admin
         if user is None or user.role != 'admin':
             return {"error": "Admin access required"}, 403
 
@@ -343,22 +339,19 @@ class AdminStatusUpdateResource(Resource):
             return {"error": "Invalid entity type"}, 400
         
         if entity:
-            # Update the entity status
             old_status = entity.status
             entity.status = new_status
             db.session.commit()
-            
-            # Fetch the user associated with the entity
             associated_user = User.query.get(entity.user_id)
             if associated_user:
-                # Send email notification
-                email_sent = send_email(
-                    to_email=associated_user.email,
-                    subject=f"Your {entity_type} status has been updated",
-                    body=f"Hello {associated_user.name},\n\nYour {entity_type} with ID {entity_id} has been updated from '{old_status}' to '{new_status}'.\n\nThank you,\nIReporter Team"
-                )
-                if not email_sent:
-                    return {"error": "Status updated, but failed to send notification email"}, 200
+                if old_status != new_status:
+                    email_sent = send_email(
+                        to_email=associated_user.email,
+                        subject=f"Your {entity_type} status has been updated",
+                        body=f"Hello {associated_user.name},\n\nYour {entity_type} with ID {entity_id} has been updated from '{old_status}' to '{new_status}'.\n\nThank you,\nIReporter Team"
+                    )
+                    if not email_sent:
+                        return {"error": "Status updated, but failed to send notification email"}, 200
             
             return entity.to_dict(), 200
         else:
