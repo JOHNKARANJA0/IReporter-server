@@ -110,7 +110,7 @@ class Users(Resource):
             email_sent = send_email(
                 to_email=data['email'],
                 subject="Your Verification Token",
-                body=f"""Hello, {data['name']}. Welcome to the Ireporter app.Your verification token is: {totp_token}"""
+                body=f"""Hello, {data['name']}.\n Welcome to the Ireporter app.\nYour verification token is: {totp_token}. \n\nThank you,\nIReporter Team"""
             )
             if email_sent:
                 return {"success": "User created successfully! Verification token sent to email.", "user": new_user.to_dict()}, 201
@@ -323,7 +323,6 @@ class InterventionResource(Resource):
 class AdminStatusUpdateResource(Resource):
     @jwt_required()
     def patch(self, entity_type, entity_id):
-        # Fetch the user ID from the JWT token
         current_user_id = get_jwt_identity()
 
         # Query the user object using the ID
@@ -344,12 +343,26 @@ class AdminStatusUpdateResource(Resource):
             return {"error": "Invalid entity type"}, 400
         
         if entity:
+            # Update the entity status
+            old_status = entity.status
             entity.status = new_status
             db.session.commit()
+            
+            # Fetch the user associated with the entity
+            associated_user = User.query.get(entity.user_id)
+            if associated_user:
+                # Send email notification
+                email_sent = send_email(
+                    to_email=associated_user.email,
+                    subject=f"Your {entity_type} status has been updated",
+                    body=f"Hello {associated_user.name},\n\nYour {entity_type} with ID {entity_id} has been updated from '{old_status}' to '{new_status}'.\n\nThank you,\nIReporter Team"
+                )
+                if not email_sent:
+                    return {"error": "Status updated, but failed to send notification email"}, 200
+            
             return entity.to_dict(), 200
         else:
             return {"error": "Entity not found"}, 404
-
 api.add_resource(Login, '/login')
 api.add_resource(CheckSession, '/check_session')
 api.add_resource(Logout, '/logout')
