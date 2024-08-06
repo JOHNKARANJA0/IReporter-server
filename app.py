@@ -228,7 +228,7 @@ class RedflagResource(Resource):
     def delete(self, redflag_id):
         current_user = get_jwt_identity()
         redflag = Redflags.query.get(redflag_id)
-        if redflag and redflag.user_id == current_user['id'] and redflag.status == 'draft':
+        if redflag and redflag.user_id == current_user and redflag.status == 'draft':
             db.session.delete(redflag)
             db.session.commit()
             return {"message": "Redflag deleted successfully"}, 200
@@ -313,7 +313,7 @@ class InterventionResource(Resource):
     def delete(self, intervention_id):
         current_user = get_jwt_identity()
         intervention = Intervention.query.get(intervention_id)
-        if intervention and intervention.user_id == current_user['id'] and intervention.status == 'draft':
+        if intervention and intervention.user_id == current_user and intervention.status == 'draft':
             db.session.delete(intervention)
             db.session.commit()
             return {"message": "Intervention deleted successfully"}, 200
