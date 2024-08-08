@@ -151,43 +151,46 @@ class RedflagResource(Resource):
     def get(self):
         redflag = Redflags.query.all()
         return [redflg.to_dict() for redflg in redflag], 200
+
     @jwt_required()
     def post(self):
         current_user = get_jwt_identity()
         data = request.form
         image = request.files.get('image')
-        video = data.get('video')
+        video = request.files.get('video')
 
         try:
             if image:
-                upload_result = cloudinary_upload(image, resource_type="image", transformation=[
+                image_upload_result = cloudinary_upload(image, resource_type="image", transformation=[
                     {"width": 200, "height": 200, "crop": "fill", "gravity": "auto"},
                     {"fetch_format": "auto", "quality": "auto"}
                 ])
-                image_url = upload_result['secure_url']
+                image_url = image_upload_result['secure_url']
             else:
                 image_url = None
 
             if video:
-                upload_result = cloudinary_upload(video, resource_type="video", transformation=[
-                    {"width": 640, "height": 360, "crop": "limit", "gravity": "auto"},
-                    {"fetch_format": "auto", "quality": "auto"}
+                video_upload_result = cloudinary_upload(video, resource_type="video", transformation=[
+                    {"width": 400, "height": 300, "crop": "pad"},
+                    {"width": 260, "height": 200, "crop": "crop", "gravity": "north"}
                 ])
-                video_url = upload_result['secure_url']
+                video_url = video_upload_result['secure_url']
             else:
                 video_url = None
 
-            new_redflag = Redflags(
-                redflag=data.get('redflag'),
+            new_entity = Redflags( 
+                redflag=data.get('redflag'), 
                 description=data.get('description'),
                 geolocation=data.get('geolocation'),
                 image=image_url,
                 video=video_url,
                 user_id=current_user
             )
-            db.session.add(new_redflag)
+            
+            db.session.add(new_entity)
             db.session.commit()
-            return new_redflag.to_dict(), 201
+            return new_entity.to_dict(), 201
+
         except Exception as e:
             db.session.rollback()
             return {"errors": [str(e)]}, 400
@@ -199,19 +202,19 @@ class RedflagResource(Resource):
         if redflag and redflag.user_id == current_user and redflag.status == 'draft':
             data = request.form
             image = request.files.get('image')
-            video = data.get('video')
+            video = request.files.get('video')
 
             try:
                 if image:
                     upload_result = cloudinary_upload(image, resource_type="image", transformation=[
-                    {"width": 500, "height": 500, "crop": "fill", "gravity": "auto"},
-                    {"fetch_format": "auto", "quality": "auto"}
-                ])
+                        {"width": 200, "height": 200, "crop": "fill", "gravity": "auto"},
+                        {"fetch_format": "auto", "quality": "auto"}
+                    ])
                     redflag.image = upload_result['secure_url']
                 if video:
                     upload_result = cloudinary_upload(video, resource_type="video", transformation=[
-                        {"width": 640, "height": 360, "crop": "limit", "gravity": "auto"},
-                        {"fetch_format": "auto", "quality": "auto"}
+                        {"width": 400, "height": 300, "crop": "pad"},
+                        {"width": 260, "height": 200, "crop": "crop", "gravity": "north"}
                     ])
                     redflag.video = upload_result['secure_url']
                 redflag.redflag = data.get('redflag', redflag.redflag)
@@ -224,6 +227,7 @@ class RedflagResource(Resource):
                 return {"errors": [str(e)]}, 400
         else:
             return {"error": "Not allowed to update"}, 403
+
     @jwt_required()
     def delete(self, redflag_id):
         current_user = get_jwt_identity()
@@ -234,7 +238,6 @@ class RedflagResource(Resource):
             return {"message": "Redflag deleted successfully"}, 200
         else:
             return {"error": "Not allowed to delete"}, 403
-
 class InterventionResource(Resource):
     def get(self):
         intervention = Intervention.query.all()
@@ -244,7 +247,7 @@ class InterventionResource(Resource):
         current_user = get_jwt_identity()
         data = request.form
         image = request.files.get('image')
-        video = data.get('video')
+        video = request.files.get('video')
 
         try:
             if image:
@@ -258,8 +261,8 @@ class InterventionResource(Resource):
 
             if video:
                 upload_result = cloudinary_upload(video, resource_type="video", transformation=[
-                    {"width": 640, "height": 360, "crop": "limit", "gravity": "auto"},
-                    {"fetch_format": "auto", "quality": "auto"}
+                    {"width": 400, "height": 300, "crop": "pad"},
+                    {"width": 260, "height": 200, "crop": "crop", "gravity": "north"}
                 ])
                 video_url = upload_result['secure_url']
             else:
@@ -287,17 +290,21 @@ class InterventionResource(Resource):
         if intervention and intervention.user_id == current_user and intervention.status == 'draft':
             data = request.form
             image = request.files.get('image')
-            video = data.get('video')
+            video = request.files.get('video')
 
             try:
                 if image:
                     upload_result = cloudinary_upload(image, resource_type="image", transformation=[
-                    {"width": 500, "height": 500, "crop": "fill", "gravity": "auto"},
+                    {"width": 200, "height": 200, "crop": "fill", "gravity": "auto"},
                     {"fetch_format": "auto", "quality": "auto"}
                 ])
                     intervention.image = upload_result['secure_url']
                 if video:
-                    intervention.video = video
+                    upload_result = cloudinary_upload(video, resource_type="video", transformation=[
+                        {"width": 400, "height": 300, "crop": "pad"},
+                        {"width": 260, "height": 200, "crop": "crop", "gravity": "north"}
+                    ])
+                    intervention.video = upload_result['secure_url']
                 intervention.intervention = data.get('intervention', intervention.intervention)
                 intervention.description = data.get('description', intervention.description)
                 intervention.geolocation = data.get('geolocation', intervention.geolocation)
