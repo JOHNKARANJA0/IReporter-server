@@ -165,14 +165,7 @@ class VerifyToken(Resource):
         if user:
             totp = pyotp.TOTP(user.token, interval=200) 
 
-            # Print for debugging
-            print(f"Token from request: {token_from_request}")
-            print(f"User token secret: {user.token}")
-            print(f"Current time: {totp.now()}")
-
-            # Verify the token
             is_valid = totp.verify(token_from_request, valid_window=1)
-            print(f"Token Verification Result: {is_valid}")
 
             if is_valid:
                 user.token_verified = True
@@ -402,37 +395,33 @@ class AdminStatusUpdateResource(Resource):
 class AdminTokenUpdateResource(Resource):
     @jwt_required()
     def patch(self, user_id):
-        # Check if the current user is an admin
         current_user_id = get_jwt_identity()
         admin_user = User.query.get(current_user_id)
         if admin_user is None or admin_user.role != 'admin':
             return {"error": "Admin access required"}, 403
 
-        # Retrieve the user to be updated
         user = User.query.get(user_id)
         if user is None:
             return {"error": "User not found"}, 404
         
         data = request.get_json()
         token_verified = data.get('token_verified')
-        
-        # Update the token_verified field
+
         if token_verified is not None:
             old_status = user.token_verified
             user.token_verified = token_verified
             db.session.commit()
             
-            # Determine if the user account is deactivated or reactivated
-            if not token_verified and old_status:  # Assuming deactivation if token_verified is False
+            if not token_verified and old_status:  
                 email_sent = send_email(
                     to_email=user.email,
                     subject="Account Deactivation Notice",
-                    body=f"Hello {user.name},\n\nYour account has been deactivated. If this was not done by you, please contact support.\n\nThank you,\nIReporter Team"
+                    body=f"Hello {user.name},\n\nYour account has been deactivated.\nYou have violated the terms and conditions of IReporter.\nIf you have any querys or you think it was done wrongly Reply to this email, please contact support.\n\nThank you,\nIReporter Team"
                 )
                 if not email_sent:
                     return {"error": "Status updated, but failed to send deactivation notification email"}, 200
             
-            elif token_verified and not old_status:  # Assuming reactivation if token_verified is True
+            elif token_verified and not old_status:  
                 email_sent = send_email(
                     to_email=user.email,
                     subject="Account Reactivation Notice",
