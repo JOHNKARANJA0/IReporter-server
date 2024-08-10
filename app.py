@@ -15,7 +15,7 @@ from utils import generate_totp_secret, generate_totp_token, send_email
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]}})
 
-app.config['SQLALCHEMY_DATABASE_URI'] =os.environ.get('DATABASE_URI') #'sqlite:///app.db'   
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI')   #'sqlite:///app.db'
 app.config["JWT_SECRET_KEY"] = "your_jwt_secret_key"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
 app.config["SECRET_KEY"] = "your_secret_key"
@@ -64,6 +64,7 @@ class CheckSession(Resource):
                 "id": user.id,
                 "name": user.name,
                 "email": user.email,
+                "image": user.image,
                 "role": user.role,
                 "intervention": intervention,
                 "redflags": redflags,
@@ -119,6 +120,40 @@ class Users(Resource):
         except Exception as e:
             db.session.rollback()
             return {"errors": [str(e)]}, 400
+    @jwt_required()
+    def patch(self):
+        current_user = get_jwt_identity()
+        user = User.query.get(current_user)
+
+        if user:
+            data = request.form
+            image = request.files.get('image')
+
+            try:
+                if image:
+                    upload_result = cloudinary_upload(image, resource_type="image", transformation=[
+                        {"width": 200, "height": 200, "crop": "fill", "gravity": "auto"},
+                        {"fetch_format": "auto", "quality": "auto"}
+                    ])
+                    user.image = upload_result['secure_url']
+                if 'name' in data:
+                    user.name = data['name']
+                if 'email' in data:
+                    user.email = data['email']
+                if 'password' in data:
+                    old_password = data.get('old_password')
+                    new_password = data.get('password')
+                    if not user.authenticate(old_password):
+                        return {"error": "Incorrect current password"}, 400
+                    user.password_hash = new_password
+
+                db.session.commit()
+                return {"message": "User profile updated successfully"}, 200
+            except Exception as e:
+                db.session.rollback()
+                return {"errors": [str(e)]}, 400
+        else:
+            return {"error": "User not found"}, 404
 class VerifyToken(Resource):
     def post(self):
         data = request.get_json()
@@ -363,6 +398,53 @@ class AdminStatusUpdateResource(Resource):
             return entity.to_dict(), 200
         else:
             return {"error": "Entity not found"}, 404
+        
+class AdminTokenUpdateResource(Resource):
+    @jwt_required()
+    def patch(self, user_id):
+        # Check if the current user is an admin
+        current_user_id = get_jwt_identity()
+        admin_user = User.query.get(current_user_id)
+        if admin_user is None or admin_user.role != 'admin':
+            return {"error": "Admin access required"}, 403
+
+        # Retrieve the user to be updated
+        user = User.query.get(user_id)
+        if user is None:
+            return {"error": "User not found"}, 404
+        
+        data = request.get_json()
+        token_verified = data.get('token_verified')
+        
+        # Update the token_verified field
+        if token_verified is not None:
+            old_status = user.token_verified
+            user.token_verified = token_verified
+            db.session.commit()
+            
+            # Determine if the user account is deactivated or reactivated
+            if not token_verified and old_status:  # Assuming deactivation if token_verified is False
+                email_sent = send_email(
+                    to_email=user.email,
+                    subject="Account Deactivation Notice",
+                    body=f"Hello {user.name},\n\nYour account has been deactivated. If this was not done by you, please contact support.\n\nThank you,\nIReporter Team"
+                )
+                if not email_sent:
+                    return {"error": "Status updated, but failed to send deactivation notification email"}, 200
+            
+            elif token_verified and not old_status:  # Assuming reactivation if token_verified is True
+                email_sent = send_email(
+                    to_email=user.email,
+                    subject="Account Reactivation Notice",
+                    body=f"Welcome back {user.name},\n\nYour account has been reactivated.\nPlease ensure that you maintain your usage within our terms and conditions.\n\nThank you,\nIReporter Team"
+                )
+                if not email_sent:
+                    return {"error": "Status updated, but failed to send reactivation notification email"}, 200
+            
+            return {"message": "User token_verified updated successfully"}, 200
+        else:
+            return {"error": "No token_verified field provided"}, 400
+
 api.add_resource(Login, '/login')
 api.add_resource(CheckSession, '/check_session')
 api.add_resource(Logout, '/logout')
@@ -371,6 +453,7 @@ api.add_resource(VerifyToken, '/verify_token')
 api.add_resource(RedflagResource, '/redflags', '/redflags/<int:redflag_id>')
 api.add_resource(InterventionResource, '/interventions', '/interventions/<int:intervention_id>')
 api.add_resource(AdminStatusUpdateResource, '/admin/<string:entity_type>/<int:entity_id>/status')
+api.add_resource(AdminTokenUpdateResource, '/admin/users/<int:user_id>/update-token')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)

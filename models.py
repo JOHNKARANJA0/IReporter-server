@@ -25,6 +25,7 @@ class User(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
+    image = db.Column(db.String, nullable=True)
     role = db.Column(db.String, nullable=False)
     _password_hash = db.Column('password_hash', db.String(128), nullable=False)
     token = db.Column(db.String(32), nullable=True)
@@ -41,7 +42,7 @@ class User(db.Model, SerializerMixin):
         assert '@' in value, "Invalid Email provided"
         return value
     
-    @hybrid_property
+    @hybrid_property    
     def password_hash(self):
         raise AttributeError('Password hashes may not be viewed.')
     
