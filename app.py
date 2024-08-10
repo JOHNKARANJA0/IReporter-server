@@ -416,7 +416,7 @@ class AdminTokenUpdateResource(Resource):
                 email_sent = send_email(
                     to_email=user.email,
                     subject="Account Deactivation Notice",
-                    body=f"Hello {user.name},\n\nYour account has been deactivated.\nYou have violated the terms and conditions of IReporter.\nIf you have any querys or you think it was done wrongly Reply to this email, please contact support.\n\nThank you,\nIReporter Team"
+                    body=f"Hello {user.name},\n\nYour account has been deactivated.\nYou have violated the terms and conditions of IReporter.\nIf you have any querys or you think it was done wrongly reply to this email to contact support.\n\nThank you,\nIReporter Team"
                 )
                 if not email_sent:
                     return {"error": "Status updated, but failed to send deactivation notification email"}, 200
