@@ -47,6 +47,8 @@ class Login(Resource):
         user = User.query.filter_by(email=email).first()
 
         if user and user.authenticate(password):
+            user.is_online = True
+            db.session.commit()
             access_token = create_access_token(identity=user.id)
             return {"access_token": access_token}
         else:
@@ -58,6 +60,8 @@ class CheckSession(Resource):
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         if user:
+            user.is_active = True
+            db.session.commit()
             intervention = [interv.to_dict(only=('id', 'intervention', 'description', 'geolocation', 'image', 'video', 'date_added', 'status')) for interv in user.interventions]
             redflags = [redflgs.to_dict(only=('id', 'redflag', 'description', 'geolocation', 'image', 'video', 'date_added', 'status')) for redflgs in user.redflags]
             return {
@@ -68,7 +72,8 @@ class CheckSession(Resource):
                 "role": user.role,
                 "intervention": intervention,
                 "redflags": redflags,
-                "token_verified": user.token_verified
+                "token_verified": user.token_verified,
+                "is_active": user.is_active
             }, 200
         else:
             return {"error": "User not found"}, 404
@@ -81,6 +86,12 @@ def check_if_token_in_blocklist(jwt_header, decrypted_token):
 class Logout(Resource):
     @jwt_required()
     def post(self):
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if user:
+            user.is_active = False
+            db.session.commit()
         jti = get_jwt()["jti"]
         BLACKLIST.add(jti)
         return {"success": "Successfully logged out"}, 200
@@ -88,7 +99,7 @@ class Logout(Resource):
 class Users(Resource):
     def get(self):
         users = User.query.all()
-        return [user.to_dict(only=('id', 'name', 'email', 'role', 'interventions','redflags', 'token_verified')) for user in users], 200
+        return [user.to_dict(only=('id', 'name', 'email', 'role', 'interventions','redflags', 'token_verified', 'is_active')) for user in users], 200
 
     def post(self):
         data = request.get_json()
