@@ -59,7 +59,6 @@ def seed_data():
             geolocation=generate_random_geolocation(),
             image="", 
             video="",  
-            date_added=datetime.now(tz=timezone.utc),
             user=random.choice([user1,user4])
         )
         db.session.add(redflag)
@@ -75,7 +74,6 @@ def seed_data():
             geolocation=generate_random_geolocation(),
             image="",  
             video="",  
-            date_added=datetime.now(tz=timezone.utc),
             user=random.choice([user1,user4])
         )
         db.session.add(intervention)

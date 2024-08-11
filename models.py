@@ -64,7 +64,7 @@ class Redflags(db.Model, SerializerMixin):
     geolocation = db.Column(db.String, nullable=False)
     image = db.Column(db.String, nullable=True)
     video = db.Column(db.String, nullable=True)
-    date_added = db.Column(db.DateTime, default=lambda: datetime.now(tz=timezone.utc))
+    date_added = db.Column(db.DateTime, default=lambda: datetime.now())
     status = db.Column(db.String, default='draft')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
@@ -82,7 +82,7 @@ class Intervention(db.Model, SerializerMixin):
     geolocation = db.Column(db.String, nullable=False)
     image = db.Column(db.String, nullable=True)
     video = db.Column(db.String, nullable=True)
-    date_added = db.Column(db.DateTime, default=lambda: datetime.now(tz=timezone.utc))
+    date_added = db.Column(db.DateTime, default=lambda: datetime.now())
     status = db.Column(db.String, default='draft')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
