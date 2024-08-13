@@ -417,6 +417,7 @@ class AdminTokenUpdateResource(Resource):
         
         data = request.get_json()
         token_verified = data.get('token_verified')
+        role = data.get('role')
 
         if token_verified is not None:
             old_status = user.token_verified
@@ -442,8 +443,14 @@ class AdminTokenUpdateResource(Resource):
                     return {"error": "Status updated, but failed to send reactivation notification email"}, 200
             
             return {"message": "User token_verified updated successfully"}, 200
-        else:
-            return {"error": "No token_verified field provided"}, 400
+        if role is not None:
+            if role not in ['user','admin']:
+                return {"error": "Invalid role provided"}, 400
+            
+            user.role = role
+            db.session.commit()
+            return {"message": "User role updated successfully"}, 200
+        return {"error": "No token_verified field provided"}, 400
 
 api.add_resource(Login, '/login')
 api.add_resource(CheckSession, '/check_session')
