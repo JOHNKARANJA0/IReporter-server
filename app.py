@@ -475,8 +475,9 @@ class AdminTokenUpdateResource(Resource):
             return {"message": "User admin request status updated successfully"}, 200
 
         return {"error": "No valid field provided"}, 400
-@jwt_required()
-class Request_admin(Resource):
+
+class RequestAdmin(Resource):
+    @jwt_required()
     def post(self):
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
@@ -520,7 +521,7 @@ api.add_resource(RedflagResource, '/redflags', '/redflags/<int:redflag_id>')
 api.add_resource(InterventionResource, '/interventions', '/interventions/<int:intervention_id>')
 api.add_resource(AdminStatusUpdateResource, '/admin/<string:entity_type>/<int:entity_id>/status')
 api.add_resource(AdminTokenUpdateResource, '/admin/users/<int:user_id>/update-token')
-api.add_resource(Request_admin, '/admin/request-admin')
+api.add_resource(RequestAdmin, '/admin/request-admin')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
