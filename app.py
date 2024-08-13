@@ -483,19 +483,17 @@ class RequestAdmin(Resource):
         user = User.query.get(current_user_id)
 
         if not user:
-            return jsonify({"error": "User not found"}), 404
+            return {"error": "User not found"}, 404
 
         if user.role == 'admin':
-            return jsonify({"message": "You are already an admin"}), 400
+            return {"message": "You are already an admin"}, 400
 
         if user.requesting_admin:
-            return jsonify({"message": "You have already requested admin access"}), 400
+            return {"message": "You have already requested admin access"}, 400
 
-        # Mark the user as requesting admin status
         user.requesting_admin = True
         db.session.commit()
 
-        # Notify all admins
         admins = User.query.filter_by(role='admin').all()
         for admin in admins:
             send_email(
@@ -509,7 +507,7 @@ class RequestAdmin(Resource):
                 body=f"Hello, {user.name}\nYour request to be an admin is under review.\nYou will recieve feedback in the next 24 hours.\n\nThank you,\nIReporter Team"
             )  
 
-        return jsonify({"message": "Admin request sent successfully"}), 200
+        return {"message": "Admin request sent successfully"}, 200
 
 
 api.add_resource(Login, '/login')
@@ -521,7 +519,7 @@ api.add_resource(RedflagResource, '/redflags', '/redflags/<int:redflag_id>')
 api.add_resource(InterventionResource, '/interventions', '/interventions/<int:intervention_id>')
 api.add_resource(AdminStatusUpdateResource, '/admin/<string:entity_type>/<int:entity_id>/status')
 api.add_resource(AdminTokenUpdateResource, '/admin/users/<int:user_id>/update-token')
-api.add_resource(RequestAdmin, '/admin/request-admin')
+api.add_resource(RequestAdmin, '/request-admin')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
