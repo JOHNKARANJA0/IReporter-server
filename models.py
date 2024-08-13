@@ -31,6 +31,7 @@ class User(db.Model, SerializerMixin):
     token = db.Column(db.String(32), nullable=True)
     token_verified = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=False)
+    requesting_admin = db.Column(db.Boolean, default=False)
     
     
     redflags = db.relationship('Redflags', backref='user', lazy=True, cascade='all, delete-orphan')

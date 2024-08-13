@@ -73,7 +73,8 @@ class CheckSession(Resource):
                 "intervention": intervention,
                 "redflags": redflags,
                 "token_verified": user.token_verified,
-                "is_active": user.is_active
+                "is_active": user.is_active,
+                "requesting_admin":user.requesting_admin
             }, 200
         else:
             return {"error": "User not found"}, 404
@@ -99,7 +100,7 @@ class Logout(Resource):
 class Users(Resource):
     def get(self):
         users = User.query.all()
-        return [user.to_dict(only=('id', 'name', 'email', 'role', 'interventions','redflags', 'token_verified', 'is_active')) for user in users], 200
+        return [user.to_dict(only=('id', 'name', 'email', 'role', 'interventions','redflags', 'token_verified', 'is_active', 'requesting_admin')) for user in users], 200
 
     def post(self):
         data = request.get_json()
@@ -418,6 +419,7 @@ class AdminTokenUpdateResource(Resource):
         data = request.get_json()
         token_verified = data.get('token_verified')
         role = data.get('role')
+        requesting_admin = data.get('requesting_admin')
 
         if token_verified is not None:
             old_status = user.token_verified
@@ -443,14 +445,71 @@ class AdminTokenUpdateResource(Resource):
                     return {"error": "Status updated, but failed to send reactivation notification email"}, 200
             
             return {"message": "User token_verified updated successfully"}, 200
-        if role is not None:
-            if role not in ['user','admin']:
+        
+        if role:
+            if role not in ['user', 'admin']:
                 return {"error": "Invalid role provided"}, 400
-            
+
             user.role = role
+            user.requesting_admin = False
             db.session.commit()
-            return {"message": "User role updated successfully"}, 200
-        return {"error": "No token_verified field provided"}, 400
+            if role == 'admin':
+                send_email(
+                    to_email=user.email,
+                    subject="Admin Access Granted",
+                    body=f"Hello {user.name},\n\nCongratulations! You have been granted admin access in IReporter.\n\nThank you,\nIReporter Team"
+                )
+            elif role == 'user':
+                send_email(
+                    to_email=user.email,
+                    subject="Admin Access Revoked",
+                    body=f"Hello {user.name},\n\nYour admin access has been revoked. You are a regular user.\n\nThank you,\nIReporter Team"
+                )
+
+            return {"message": f"User role updated to {role} successfully"}, 200
+        
+        if requesting_admin is not None:
+            user.requesting_admin = requesting_admin
+            db.session.commit()
+
+            return {"message": "User admin request status updated successfully"}, 200
+
+        return {"error": "No valid field provided"}, 400
+@jwt_required()
+class Request_admin(Resource):
+    def post(self):
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        if user.role == 'admin':
+            return jsonify({"message": "You are already an admin"}), 400
+
+        if user.requesting_admin:
+            return jsonify({"message": "You have already requested admin access"}), 400
+
+        # Mark the user as requesting admin status
+        user.requesting_admin = True
+        db.session.commit()
+
+        # Notify all admins
+        admins = User.query.filter_by(role='admin').all()
+        for admin in admins:
+            send_email(
+                to_email=admin.email,
+                subject="New Admin Request",
+                body=f"User {user.name} ({user.email}) has requested to become an admin. Please review the request."
+            )
+        send_email(
+                to_email=user.email,
+                subject="Admin Request Under Review",
+                body=f"Hello, {user.name}\nYour request to be an admin is under review.\nYou will recieve feedback in the next 24 hours.\n\nThank you,\nIReporter Team"
+            )  
+
+        return jsonify({"message": "Admin request sent successfully"}), 200
+
 
 api.add_resource(Login, '/login')
 api.add_resource(CheckSession, '/check_session')
@@ -461,6 +520,7 @@ api.add_resource(RedflagResource, '/redflags', '/redflags/<int:redflag_id>')
 api.add_resource(InterventionResource, '/interventions', '/interventions/<int:intervention_id>')
 api.add_resource(AdminStatusUpdateResource, '/admin/<string:entity_type>/<int:entity_id>/status')
 api.add_resource(AdminTokenUpdateResource, '/admin/users/<int:user_id>/update-token')
+api.add_resource(Request_admin, '/admin/request-admin')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
